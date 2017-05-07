@@ -4,6 +4,8 @@ import com.google.gson.Gson
 import com.noiseapps.websockets.models.Message
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
+import org.springframework.http.HttpStatus
+import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
@@ -26,12 +28,17 @@ class RootController {
     }
 
     @RequestMapping("/push/{nick}")
-    fun onGetRequest(@PathVariable nick : String): Message {
+    fun onGetRequest(@PathVariable nick : String): ResponseEntity<Message> {
         val msg = Message(title = "Hello $nick", message = "Some random string ${Math.random()}")
         val msgString = Gson().toJson(msg)
         val sid = SocketHandler.sessionMapping[nick]
-        logger.info("Pushing message to device with sid $sid: $msgString")
-        SocketHandler.sessions[sid]?.sendMessage(TextMessage(msgString))
-        return msg
+        if(sid != null) {
+            logger.info("Pushing message to device with sid $sid: $msgString")
+            SocketHandler.sessions[sid]?.sendMessage(TextMessage(msgString))
+            return ResponseEntity(msg, HttpStatus.OK)
+        }
+        logger.warn("Trying to push message to non-existing user '$nick'")
+        val err = Message(title = "Error", message = "User with nickname '$nick' not found")
+        return ResponseEntity(err, HttpStatus.NOT_FOUND)
     }
 }
